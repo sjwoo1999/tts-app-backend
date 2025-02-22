@@ -3,14 +3,11 @@ import functions_framework
 
 @functions_framework.http
 def generate_tts(request):
-    # CORS 헤더 기본 설정
     headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST',
         'Access-Control-Allow-Headers': 'Content-Type'
     }
-
-    # OPTIONS 요청 처리
     if request.method == 'OPTIONS':
         return ('', 204, headers)
 
@@ -21,10 +18,11 @@ def generate_tts(request):
     try:
         client = texttospeech.TextToSpeechClient()
         synthesis_input = texttospeech.SynthesisInput(ssml=request_json['ssml'])
+        # 기본 목소리: ko-KR-Wavenet-A, 요청에 따라 변경
+        voice_name = request_json.get('voice', 'ko-KR-Wavenet-A')
         voice = texttospeech.VoiceSelectionParams(
             language_code="ko-KR",
-            name="ko-KR-Wavenet-A",
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+            name=voice_name  # 클라이언트에서 받은 목소리
         )
         audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3
@@ -35,4 +33,4 @@ def generate_tts(request):
         headers['Content-Type'] = 'audio/mp3'
         return (response.audio_content, 200, headers)
     except Exception as e:
-        return (f'에러: {str(e)}', 500, headers)  # 에러 메시지 반환
+        return (f'에러: {str(e)}', 500, headers)
