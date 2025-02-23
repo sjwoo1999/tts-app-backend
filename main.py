@@ -1,5 +1,6 @@
 from google.cloud import texttospeech
 import functions_framework
+import json
 
 @functions_framework.http
 def generate_tts(request):
@@ -12,17 +13,38 @@ def generate_tts(request):
         return ('', 204, headers)
 
     request_json = request.get_json(silent=True)
-    if not request_json or 'ssml' not in request_json:
-        return ('SSML 필요', 400, headers)
+    if not request_json:
+        return ('요청 데이터 필요', 400, headers)
 
     try:
+        # SSML 직접 입력 또는 JSON으로 속성 전달
+        if 'ssml' in request_json:
+            ssml = request_json['ssml']
+        elif 'segments' in request_json:
+            # JSON segments를 SSML로 변환
+            segments = request_json['segments']
+            ssml = '<speak>'
+            for segment in segments:
+                text = segment.get('text', '')
+                rate = segment.get('rate', '1.0')
+                emphasis = segment.get('emphasis', 'none')
+                break_time = segment.get('break', '0ms')
+                ssml += f'<prosody rate="{rate}">'
+                if emphasis != 'none':
+                    ssml += f'<emphasis level="{emphasis}">{text}</emphasis>'
+                else:
+                    ssml += text
+                ssml += f'</prosody><break time="{break_time}"/>'
+            ssml += '</speak>'
+        else:
+            return ('SSML 또는 segments 필요', 400, headers)
+
         client = texttospeech.TextToSpeechClient()
-        synthesis_input = texttospeech.SynthesisInput(ssml=request_json['ssml'])
-        # 기본 목소리: ko-KR-Wavenet-A, 요청에 따라 변경
+        synthesis_input = texttospeech.SynthesisInput(ssml=ssml)
         voice_name = request_json.get('voice', 'ko-KR-Wavenet-A')
         voice = texttospeech.VoiceSelectionParams(
             language_code="ko-KR",
-            name=voice_name  # 클라이언트에서 받은 목소리
+            name=voice_name
         )
         audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3
